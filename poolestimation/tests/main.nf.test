@@ -1,0 +1,120 @@
+// nf-test file: tests one Nextflow process in isolation (feed it a known
+// input, run it, check the output). Two independent test("...") cases live
+// below: a real run and a fast stub run.
+nextflow_process {
+
+    name "Test Process METAPROVIZ_POOLESTIMATION"
+    script "../main.nf"                    // the file that defines the process, relative to this test file
+    process "METAPROVIZ_POOLESTIMATION"    // which process inside that file to run
+    config "./nextflow.config"             // enables moduleBinaries; see that file re: Docker/profiles
+
+    // Tags let you run whole groups of tests at once, e.g.
+    // `nf-test test --tag metaproviz` runs every MetaProViz module's tests.
+    tag "modules"
+    tag "modules_nfcore"
+    tag "metaproviz"
+    tag "metaproviz/poolestimation"
+
+    test("pool estimation - cellular se rds") {
+
+        // "when" = the setup: what input the process receives.
+        // input[0] fills the process's first declared input in main.nf
+        // (tuple val(meta), path(se_rds), path(data_matrix),
+        // path(feature_matrix), path(sample_matrix)) — the two shapes are
+        // mutually exclusive, so unused slots get []. Here a real SE .rds,
+        // so this test actually runs pool_estimation.R for real. It runs on
+        // the host machine's R/MetaProViz, not inside the Docker image —
+        // see the Docker/profiles note in ./nextflow.config.
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id:'test' ],
+                    file("\${projectDir}/input/cellline/intracell/SE.RData", checkIfExists: true),
+                    [], [], []
+                ]
+                """
+            }
+        }
+
+        // "then" = the checks, run after the process finishes.
+        // assertAll runs every check and reports all failures, not just
+        // the first one it hits.
+        then {
+            assertAll(
+                { assert process.success },                // did it exit without error?
+                { assert process.out.versions != null },  // process.out.<name> matches the "emit:" names in main.nf
+                // snapshot(...).match(): first run records these outputs into
+                // main.nf.test.snap. Every run after that fails if the output
+                // changes at all — catches silent regressions automatically.
+                { assert snapshot(
+                    process.out.cv_table,
+                    process.out.high_var,
+                    process.out.versions
+                  ).match() }
+            )
+        }
+    }
+
+    test("pool estimation - cellular csv matrices") {
+
+        // Same underlying data as the .rds test above, but via the other
+        // acceptable input shape: the 3 flat TSV files instead of an SE.
+        // Confirms both shapes produce equivalent results (verified by hand
+        // to be byte-identical CV values before this test was written).
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id:'test' ],
+                    [],
+                    file("\${projectDir}/input/cellline/intracell/csv/data_matrix.csv", checkIfExists: true),
+                    file("\${projectDir}/input/cellline/intracell/csv/feature_matrix.csv", checkIfExists: true),
+                    file("\${projectDir}/input/cellline/intracell/csv/sample_matrix.csv", checkIfExists: true)
+                ]
+                """
+            }
+        }
+
+        then {
+            assertAll(
+                { assert process.success },
+                { assert process.out.versions != null },
+                { assert snapshot(
+                    process.out.cv_table,
+                    process.out.high_var,
+                    process.out.versions
+                  ).match() }
+            )
+        }
+    }
+
+    test("pool estimation - cellular se rds - stub") {
+
+        // -stub makes Nextflow run the process's "stub:" block instead of
+        // its real "script:" block. The stub just touches empty placeholder
+        // files — no R, no MetaProViz, no real computation. This proves the
+        // wiring is correct (inputs connected right, every declared output
+        // actually gets created) fast, without paying for a real run.
+        options "-stub"
+
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id:'test' ],
+                    file("\${projectDir}/input/cellline/intracell/SE.RData", checkIfExists: true),
+                    [], [], []
+                ]
+                """
+            }
+        }
+
+        then {
+            assertAll(
+                { assert process.success },
+                { assert snapshot(process.out).match() }
+            )
+        }
+    }
+}

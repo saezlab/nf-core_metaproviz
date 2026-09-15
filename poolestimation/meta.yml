@@ -1,0 +1,95 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/nf-core/modules/master/modules/meta-schema.json
+name: "metaproviz_poolestimation"
+# TODO: more details? diff text/keywords? licence?
+description: Estimate metabolite-detection quality from pool (QC) samples in a SummarizedExperiment using MetaProViz::pool_estimation.
+keywords:
+  - metabolomics
+  - quality control
+  - pool samples
+  - coefficient of variation
+  - MetaProViz
+tools:
+  - "metaproviz":
+      description: "MetaProViz — Metabolomics Processing, functional analysis and Visualization." # TODO: more detail?
+      homepage: "https://saezlab.github.io/MetaProViz/"
+      documentation: "https://saezlab.github.io/MetaProViz/"
+      tool_dev_url: "https://github.com/saezlab/MetaProViz"
+      doi: "10.1038/s44320-026-00231-8"
+      licence: ["BSD-3-Clause"]
+
+input:
+  - - meta:
+        type: map
+        description: |
+          Groovy Map containing sample information
+          e.g. `[ id:'test' ]`
+    - se_rds:
+        type: file
+        description: A SummarizedExperiment (assay + colData with pool samples) saved as RDS. Mutually exclusive with data_matrix/feature_matrix/sample_matrix — provide this alone, or the other three alone, not both. Pass [] when using the other shape.
+        pattern: "*.rds"
+        optional: true
+    - data_matrix:
+        type: file
+        description: Feature-by-sample abundance matrix (TSV/CSV), first column the feature ID. Required together with feature_matrix and sample_matrix if se_rds is not given; pass [] otherwise.
+        pattern: "*.{tsv,csv}"
+        optional: true
+    - feature_matrix:
+        type: file
+        description: Feature metadata (TSV/CSV), first column the feature ID matching data_matrix's rows. Required together with data_matrix and sample_matrix if se_rds is not given; pass [] otherwise.
+        pattern: "*.{tsv,csv}"
+        optional: true
+    - sample_matrix:
+        type: file
+        description: Sample metadata with pool samples (TSV/CSV), first column the sample ID matching data_matrix's columns. Required together with data_matrix and feature_matrix if se_rds is not given; pass [] otherwise.
+        pattern: "*.{tsv,csv}"
+        optional: true
+
+output:
+  - se:
+      - meta:
+          type: map
+          description: |
+            Groovy Map containing sample information
+            e.g. `[ id:'test' ]`
+      - "*.pool_filtered.rds":
+          type: file
+          description: SE with high-variance features removed (or a copy if filtering is off).
+          pattern: "*.pool_filtered.rds"
+  - cv_table:
+      - "*.cv.tsv":
+          type: file
+          description: Per-feature CV across pool samples, with the HighVar flag.
+          pattern: "*.cv.tsv"
+  - high_var:
+      - "*.high_var.txt":
+          type: file
+          description: One high-variance feature name per line.
+          pattern: "*.high_var.txt"
+  - plots:
+      - "*.plots.rds":
+          type: file
+          description: Saved ggplot objects (CV scatter, PCA, …).
+          pattern: "*.plots.rds"
+  - report:
+      - "*.report.html":
+          type: file
+          description: Self-contained HTML report.
+          pattern: "*.report.html"
+  - log:
+      - "*.log":
+          type: file
+          description: INFO/WARN log.
+          pattern: "*.log"
+  - versions:
+      - "versions.yml":
+          type: file
+          description: File containing software versions.
+          pattern: "versions.yml"
+
+authors:
+  - "@christinaschmidt1"
+  - "@giuliaroeth"
+maintainers:
+  - "@christinaschmidt1"
+  - "@giuliaroeth"
